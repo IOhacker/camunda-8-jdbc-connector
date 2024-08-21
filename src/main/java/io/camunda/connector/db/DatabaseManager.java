@@ -47,7 +47,8 @@ public class DatabaseManager {
   public void closeConnection(Connection con) {
     try {
       dataSource.evictConnection(con);
-    } catch (Exception e) {
+    } 
+    catch (Exception e) {
       LOGGER.error("error " + e.getMessage());
     }
   }
