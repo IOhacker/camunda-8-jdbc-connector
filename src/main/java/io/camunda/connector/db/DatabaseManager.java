@@ -10,19 +10,27 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import io.camunda.connector.api.error.ConnectorException;
 import io.camunda.connector.params.JDBCParams;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.jdbc.datasource.DataSourceUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DatabaseManager {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseManager.class);
   private final HikariDataSource dataSource;
+  private final HikariConfig config = new HikariConfig();
+  private Connection con = null;
 
   public DatabaseManager(JDBCParams jdbcParams) {
-    HikariConfig config = new HikariConfig();
     config.setJdbcUrl(jdbcParams.getJdbcUrl());
     config.setUsername(jdbcParams.getUserName());
     config.setPassword(jdbcParams.getPassword());
@@ -32,12 +40,24 @@ public class DatabaseManager {
     dataSource = new HikariDataSource(config);
   }
 
+  public Connection getConnection() throws SQLException {
+    return dataSource.getConnection();
+  }
+
+  public void closeConnection(Connection con) {
+    try {
+      dataSource.evictConnection(con);
+    } catch (Exception e) {
+      LOGGER.error("error " + e.getMessage());
+    }
+  }
+
   private Map<String, Object> getRow(ResultSet rs) throws SQLException {
     final Map<String, Object> row = new HashMap<>();
     int colCount = rs.getMetaData().getColumnCount();
     for (int i = 0; i < colCount; i++) {
       String colName = rs.getMetaData().getColumnName(i + 1);
-      row.put(colName.toUpperCase(), rs.getObject(i + 1));
+      row.put(colName, rs.getObject(i + 1));
     }
     return row;
   }
@@ -55,7 +75,6 @@ public class DatabaseManager {
         colNumber = i + 1;
       }
     }
-
     while (rs.next()) {
       Object mapKeyVal = rs.getObject(colNumber);
       List<Map<String, Object>> existing = result.get(mapKeyVal);
@@ -104,13 +123,17 @@ public class DatabaseManager {
     if (params == null) {
       params = new HashMap<>();
     }
-    try (Connection con = DataSourceUtils.getConnection(dataSource);
-        PreparedStatement pst = prepareStatement(con, statement, params);
-        ResultSet rs = pst.executeQuery(); ) {
+    try {
+      this.con = getConnection();
+      PreparedStatement pst = prepareStatement(con, statement, params);
+      ResultSet rs = pst.executeQuery();
       rs.next();
       return getRow(rs);
     } catch (SQLException e) {
+      LOGGER.error("error " + e.getMessage());
       throw new ConnectorException(Integer.toString(e.getErrorCode()), e);
+    } finally {
+      closeConnection(this.con);
     }
   }
 
@@ -118,12 +141,16 @@ public class DatabaseManager {
     if (params == null) {
       params = new HashMap<>();
     }
-    try (Connection con = DataSourceUtils.getConnection(dataSource);
-        PreparedStatement pst = prepareStatement(con, statement, params);
-        ResultSet rs = pst.executeQuery(); ) {
+    try {
+      this.con = getConnection();
+      PreparedStatement pst = prepareStatement(con, statement, params);
+      ResultSet rs = pst.executeQuery();
       return getList(rs);
     } catch (SQLException e) {
+      LOGGER.error("error " + e.getMessage());
       throw new ConnectorException(Integer.toString(e.getErrorCode()), e);
+    } finally {
+      closeConnection(this.con);
     }
   }
 
@@ -132,12 +159,16 @@ public class DatabaseManager {
     if (params == null) {
       params = new HashMap<>();
     }
-    try (Connection con = DataSourceUtils.getConnection(dataSource);
-        PreparedStatement pst = prepareStatement(con, statement, params);
-        ResultSet rs = pst.executeQuery(); ) {
+    try {
+      this.con = getConnection();
+      PreparedStatement pst = prepareStatement(con, statement, params);
+      ResultSet rs = pst.executeQuery();
       return getMap(rs, mapKey);
     } catch (SQLException e) {
+      LOGGER.error("error " + e.getMessage());
       throw new ConnectorException(Integer.toString(e.getErrorCode()), e);
+    } finally {
+      closeConnection(this.con);
     }
   }
 
@@ -145,11 +176,15 @@ public class DatabaseManager {
     if (params == null) {
       params = new HashMap<>();
     }
-    try (Connection con = DataSourceUtils.getConnection(dataSource);
-        PreparedStatement pst = prepareStatement(con, statement, params); ) {
+    try {
+      this.con = getConnection();
+      PreparedStatement pst = prepareStatement(con, statement, params);
       return pst.executeUpdate();
     } catch (SQLException e) {
+      LOGGER.error("error " + e.getMessage());
       throw new ConnectorException(Integer.toString(e.getErrorCode()), e);
+    } finally {
+      closeConnection(this.con);
     }
   }
 }
