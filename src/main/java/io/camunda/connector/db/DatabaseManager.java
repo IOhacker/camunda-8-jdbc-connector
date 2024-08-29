@@ -34,6 +34,12 @@ public class DatabaseManager {
     config.setJdbcUrl(jdbcParams.getJdbcUrl());
     config.setUsername(jdbcParams.getUserName());
     config.setPassword(jdbcParams.getPassword());
+    config.setIdleTimeout(60000);
+    config.setConnectionTimeout(20000);
+    // config.setMaxLifetime(30000);
+    config.setMinimumIdle(3);
+    config.setMaximumPoolSize(10);
+    config.setAutoCommit(true);
     config.addDataSourceProperty("cachePrepStmts", "true");
     config.addDataSourceProperty("prepStmtCacheSize", "250");
     config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
@@ -47,8 +53,7 @@ public class DatabaseManager {
   public void closeConnection(Connection con) {
     try {
       dataSource.evictConnection(con);
-    } 
-    catch (Exception e) {
+    } catch (Exception e) {
       LOGGER.error("error " + e.getMessage());
     }
   }
